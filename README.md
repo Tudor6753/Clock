@@ -1,4 +1,4 @@
-# Spotlight Clock
+# Smart Clock
 
 Fullscreen Android-friendly clock that rotates through Windows Spotlight images and shows concise weather data in the lower-right corner.
 
