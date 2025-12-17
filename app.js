@@ -30,6 +30,7 @@ initClock();
 initSlideshow();
 initWeather();
 initFullscreen();
+initPixelSafety();
 
 function initClock() {
 	if (!timeEl || !dateEl) {
@@ -479,4 +480,93 @@ function initFullscreen() {
 			}
 		}
 	});
+}
+
+function initPixelSafety() {
+	const clock = document.querySelector(".clock");
+	const weather = document.querySelector(".weather");
+	const fsBtn = document.querySelector(".fullscreen-btn");
+
+	if (!clock || !weather || !fsBtn) return;
+
+	let corner = 0; // 0: TR, 1: BR, 2: BL, 3: TL
+
+	const resetStyles = (el) => {
+		el.style.position = "";
+		el.style.top = "";
+		el.style.bottom = "";
+		el.style.left = "";
+		el.style.right = "";
+		el.style.width = "";
+		el.style.transform = "";
+		el.style.transformOrigin = "";
+		el.style.zIndex = "";
+		el.style.overflow = "";
+	};
+
+	setInterval(() => {
+		// 1. Cycle Corners
+		corner = (corner + 1) % 4;
+
+		// 2. Determine Layout Mode
+		// Even corners (0:TR, 2:BL) -> Normal Layout (Clock Center, Weather BR)
+		// Odd corners (1:BR, 3:TL) -> Swapped Layout (Weather Center, Clock moves)
+		const isSwapped = corner % 2 !== 0;
+
+		resetStyles(clock);
+		resetStyles(weather);
+		resetStyles(fsBtn);
+
+		if (isSwapped) {
+			// Weather to Center
+			weather.style.position = "static";
+			weather.style.width = "auto";
+			weather.style.transform = "scale(1.5)";
+
+			// Clock to corner - use wrapper approach
+			clock.style.position = "fixed";
+			clock.style.zIndex = "50";
+			clock.style.overflow = "visible";
+			clock.style.width = "auto";
+			
+			// Scale down while maintaining proper box sizing
+			const scale = 0.35;
+			clock.style.transform = `scale(${scale})`;
+
+			if (corner === 1) {
+				// Button is BR, so Clock goes TL to avoid collision
+				clock.style.top = "0";
+				clock.style.left = "0";
+				clock.style.transformOrigin = "top left";
+			} else {
+				// Button is TL (Corner 3), so Clock goes BR
+				clock.style.bottom = "0";
+				clock.style.right = "0";
+				clock.style.transformOrigin = "bottom right";
+			}
+		}
+
+		// 3. Position Fullscreen Button
+		fsBtn.style.position = "fixed";
+		const pad = "clamp(12px, 3vw, 24px)";
+
+		switch (corner) {
+			case 0: // Top-Right
+				fsBtn.style.top = pad;
+				fsBtn.style.right = pad;
+				break;
+			case 1: // Bottom-Right
+				fsBtn.style.bottom = pad;
+				fsBtn.style.right = pad;
+				break;
+			case 2: // Bottom-Left
+				fsBtn.style.bottom = pad;
+				fsBtn.style.left = pad;
+				break;
+			case 3: // Top-Left
+				fsBtn.style.top = pad;
+				fsBtn.style.left = pad;
+				break;
+		}
+	}, 60000);
 }
