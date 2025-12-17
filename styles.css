@@ -218,6 +218,26 @@ body {
   text-align: left;
 }
 
+.floating-animated {
+  transition:
+    transform 0.8s ease,
+    top 0.8s ease,
+    right 0.8s ease,
+    bottom 0.8s ease,
+    left 0.8s ease,
+    width 0.8s ease,
+    opacity 0.5s ease;
+}
+
+.swap-pulse {
+  animation: swapPulse 0.65s ease;
+}
+
+@keyframes swapPulse {
+  0% { opacity: 0.7; transform: translateY(10px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .weather__header {
   display: -webkit-box;
   display: -webkit-flex;
@@ -242,6 +262,12 @@ body {
   -webkit-align-items: center;
   align-items: center;
   gap: 8px;
+}
+
+.weather__updated {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.62);
+  letter-spacing: 0.04em;
 }
 
 .weather__refresh {
@@ -401,3 +427,42 @@ body {
     transform: none;
   }
 }
+
+/* Swap layout: center both clock and weather side-by-side */
+.content.swap-mode {
+  -webkit-box-orient: horizontal;
+  -webkit-flex-direction: row;
+  flex-direction: row;
+  gap: 10px; /* small gap between boxes */
+  justify-content: center;
+  align-items: center;
+}
+
+.content.swap-mode .weather {
+  position: static;
+  right: auto;
+  bottom: auto;
+  transform: none !important;
+}
+
+.content.swap-mode .clock {
+  position: static;
+  transform: none !important;
+}
+
+.swap-transition {
+  transition: transform 0.45s ease, margin 0.45s ease, width 0.45s ease, opacity 0.45s ease;
+}
+
+/* When .swap-reverse is set, switch their visual order horizontally */
+.content.swap-mode.swap-reverse .clock {
+  order: 2;
+}
+
+.content.swap-mode.swap-reverse .weather {
+  order: 1;
+}
+
+/* Small horizontal slide used during swap animation */
+.swap-slide-left { transform: translateX(-28px); }
+.swap-slide-right { transform: translateX(28px); }

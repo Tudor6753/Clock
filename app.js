@@ -1,6 +1,7 @@
 const CLOCK_UPDATE_MS = 1000;
 const SLIDESHOW_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const WEATHER_REFRESH_MS = 15 * 60 * 1000;
+const MOVE_INTERVAL_MS = 42000; // ~42 seconds for UI corner cycling
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const DEFAULT_COORDS = { lat: 44.4323, lon: 26.1063 }; // Bucharest, Romania
 const PICSUM_URL = "https://picsum.photos/1920/1080";
@@ -486,10 +487,18 @@ function initPixelSafety() {
 	const clock = document.querySelector(".clock");
 	const weather = document.querySelector(".weather");
 	const fsBtn = document.querySelector(".fullscreen-btn");
+	const content = document.querySelector(".content");
 
 	if (!clock || !weather || !fsBtn) return;
 
 	let corner = 0; // 0: TR, 1: BR, 2: BL, 3: TL
+	let swapSide = false; // false: normal (clock left), true: reversed (clock right)
+
+	[clock, weather, fsBtn].forEach((el) => {
+		if (el) {
+			el.classList.add("floating-animated");
+		}
+	});
 
 	const resetStyles = (el) => {
 		el.style.position = "";
@@ -504,7 +513,7 @@ function initPixelSafety() {
 		el.style.overflow = "";
 	};
 
-	setInterval(() => {
+	const runCycle = () => {
 		// 1. Cycle Corners
 		corner = (corner + 1) % 4;
 
@@ -518,33 +527,62 @@ function initPixelSafety() {
 		resetStyles(fsBtn);
 
 		if (isSwapped) {
-			// Weather to Center
+			// Enter swap mode: center both clock and weather side-by-side
+			if (content) content.classList.add('swap-mode');
+
+			// Make both flow items and prepare them for a horizontal swap animation
 			weather.style.position = "static";
-			weather.style.width = "auto";
-			weather.style.transform = "scale(1.5)";
+			weather.style.width = ""; // allow natural width in flex
 
-			// Clock to corner - use wrapper approach
-			clock.style.position = "fixed";
-			clock.style.zIndex = "50";
-			clock.style.overflow = "visible";
-			clock.style.width = "auto";
-			
-			// Scale down while maintaining proper box sizing
-			const scale = 0.35;
-			clock.style.transform = `scale(${scale})`;
+			clock.style.position = "static";
+			clock.style.width = "";
 
-			if (corner === 1) {
-				// Button is BR, so Clock goes TL to avoid collision
-				clock.style.top = "0";
-				clock.style.left = "0";
-				clock.style.transformOrigin = "top left";
+			// Add swap-transition class for smooth transform/margin changes
+			weather.classList.add('swap-transition');
+			clock.classList.add('swap-transition');
+
+			// Prepare a small horizontal slide, then toggle order to produce a smooth swap
+			const slidePxClassRight = 'swap-slide-right';
+			const slidePxClassLeft = 'swap-slide-left';
+
+			// Decide next side and animate
+			const nextSide = !swapSide;
+			// apply initial small offsets in opposite direction so clearing them animates movement
+			if (nextSide) {
+				// clock will move to the right, weather to the left
+				clock.classList.add(slidePxClassRight);
+				weather.classList.add(slidePxClassLeft);
 			} else {
-				// Button is TL (Corner 3), so Clock goes BR
-				clock.style.bottom = "0";
-				clock.style.right = "0";
-				clock.style.transformOrigin = "bottom right";
+				clock.classList.add(slidePxClassLeft);
+				weather.classList.add(slidePxClassRight);
 			}
+
+			// Force reflow then flip order and remove offset classes so they animate into place
+			void clock.offsetWidth;
+			setTimeout(() => {
+				swapSide = nextSide;
+				if (content) content.classList.toggle('swap-reverse', swapSide);
+				clock.classList.remove(slidePxClassLeft, slidePxClassRight);
+				weather.classList.remove(slidePxClassLeft, slidePxClassRight);
+			}, 40);
+		} else {
+			// Exit swap mode: return to default layout (clock center, weather bottom-right)
+			if (content) content.classList.remove('swap-mode');
+			// ensure order is reset for next time
+			swapSide = false;
+			if (content) content.classList.remove('swap-reverse');
+			weather.classList.remove('swap-transition');
+			clock.classList.remove('swap-transition');
 		}
+
+		// Animate swap pulse
+		[clock, weather].forEach((el) => {
+			if (!el) return;
+			el.classList.remove("swap-pulse");
+			// Force reflow to restart animation
+			void el.offsetWidth;
+			el.classList.add("swap-pulse");
+		});
 
 		// 3. Position Fullscreen Button
 		fsBtn.style.position = "fixed";
@@ -552,21 +590,53 @@ function initPixelSafety() {
 
 		switch (corner) {
 			case 0: // Top-Right
-				fsBtn.style.top = pad;
-				fsBtn.style.right = pad;
+					fsBtn.style.top = pad;
+					fsBtn.style.right = pad;
 				break;
 			case 1: // Bottom-Right
-				fsBtn.style.bottom = pad;
-				fsBtn.style.right = pad;
+					fsBtn.style.bottom = pad;
+					fsBtn.style.right = pad;
 				break;
 			case 2: // Bottom-Left
-				fsBtn.style.bottom = pad;
-				fsBtn.style.left = pad;
+					fsBtn.style.bottom = pad;
+					fsBtn.style.left = pad;
 				break;
 			case 3: // Top-Left
-				fsBtn.style.top = pad;
-				fsBtn.style.left = pad;
+					fsBtn.style.top = pad;
+					fsBtn.style.left = pad;
 				break;
 		}
-	}, 60000);
+	};
+
+	runCycle();
+	setInterval(runCycle, MOVE_INTERVAL_MS);
+	// expose for manual testing
+	window.runCycle = runCycle;
 }
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Wake Lock is active');
+    } else {
+      console.warn('Wake Lock API is not supported in this browser');
+    }
+  } catch (err) {
+    console.error('Failed to activate Wake Lock:', err);
+  }
+}
+
+// Request wake lock when the app is loaded
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && wakeLock === null) {
+    requestWakeLock();
+  } else if (document.visibilityState === 'hidden' && wakeLock !== null) {
+    wakeLock.release();
+    wakeLock = null;
+    console.log('Wake Lock released');
+  }
+});
+
+requestWakeLock();
